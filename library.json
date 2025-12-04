@@ -1,0 +1,40 @@
+{
+  "name": "ESP32-MQTTClient",
+  "version": "0.1.0",
+  "description": "ESP32 MQTT client library wrapper with thread-safe logging support",
+  "keywords": [
+    "esp32",
+    "mqtt",
+    "client",
+    "iot",
+    "messaging",
+    "pubsub",
+    "freertos",
+    "thread-safe"
+  ],
+  "authors": [
+    {
+      "name": "packerlschupfer",
+      "email": "packerlschupfer@noreply.github.com",
+      "maintainer": true
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/packerlschupfer/ESP32-MQTTClient.git"
+  },
+  "homepage": "https://github.com/packerlschupfer/ESP32-MQTTClient",
+  "license": "MIT",
+  "frameworks": [
+    "arduino",
+    "espidf"
+  ],
+  "platforms": [
+    "espressif32"
+  ],
+  "export": {
+    "include": [
+      "src/*"
+    ]
+  }
+}
