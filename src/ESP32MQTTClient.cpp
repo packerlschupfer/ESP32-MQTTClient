@@ -21,7 +21,9 @@
 
 #include "ESP32MQTTClient.h"
 #include "ESP32MQTTClientLogging.h"
+#include "esp_err.h"
 #include "esp_timer.h"
+#include <cstring>
 
 ESP32MQTTClient::ESP32MQTTClient(/* args */)
 {
@@ -297,60 +299,42 @@ void ESP32MQTTClient::printError(esp_mqtt_error_codes_t *error_handle)
 {
     switch (error_handle->error_type)
     {
-    case MQTT_ERROR_TYPE_NONE:
-        MQTTC_LOG_E( "ERROR TYPE: %s", "MQTT_ERROR_TYPE_NONE");
-        break;
     case MQTT_ERROR_TYPE_TCP_TRANSPORT:
-        MQTTC_LOG_E( "ERROR TYPE: %s", "MQTT_ERROR_TYPE_TCP_TRANSPORT");
-        switch (error_handle->esp_transport_sock_errno)
-        {
-        case MQTT_ERROR_TYPE_NONE:
-            MQTTC_LOG_E( "ERROR CODE: %s", "MQTT_ERROR_TYPE_NONE");
-            break;
-        case MQTT_ERROR_TYPE_TCP_TRANSPORT:
-            MQTTC_LOG_E( "ERROR CODE: %s", "MQTT_ERROR_TYPE_TCP_TRANSPORT");
-            break;
-        case MQTT_ERROR_TYPE_CONNECTION_REFUSED:
-            MQTTC_LOG_E( "ERROR CODE: %s", "MQTT_ERROR_TYPE_CONNECTION_REFUSED");
-            break;
-
-        default:
-            MQTTC_LOG_E( "ERROR CODE: %s", "MQTT_TRANSPORT_UNKONW_ERR");
-            break;
-        }
-
+    {
+        // Transport errors (broker restart, network blip, connect before the link
+        // is up) are transient: esp-mqtt reconnects on its own. Log them as a
+        // warning so log forwarding does not treat them as faults. errno 0 means
+        // the connection was closed/reset without a socket error.
+        int sockErrno = error_handle->esp_transport_sock_errno;
+        MQTTC_LOG_W( "MQTT transport error: errno=%d (%s), tls_err=%s, tls_stack_err=0x%x",
+                     sockErrno,
+                     sockErrno ? strerror(sockErrno) : "connection closed",
+                     esp_err_to_name(error_handle->esp_tls_last_esp_err),
+                     error_handle->esp_tls_stack_err);
         break;
+    }
+
     case MQTT_ERROR_TYPE_CONNECTION_REFUSED:
-        MQTTC_LOG_E( "ERROR TYPE: %s", "MQTT_ERROR_TYPE_CONNECTION_REFUSED");
+    {
+        // Broker rejected the connection - a configuration problem (credentials,
+        // client id, protocol) that will not fix itself: keep it an error.
+        const char* reason;
         switch (error_handle->connect_return_code)
         {
-        case MQTT_CONNECTION_ACCEPTED:
-            MQTTC_LOG_E( "ERROR CODE: %s", "MQTT_CONNECTION_ACCEPTED");
-            break;
-        case MQTT_CONNECTION_REFUSE_PROTOCOL:
-            MQTTC_LOG_E( "ERROR CODE: %s", "MQTT_CONNECTION_REFUSE_PROTOCOL");
-            break;
-        case MQTT_CONNECTION_REFUSE_ID_REJECTED:
-            MQTTC_LOG_E( "ERROR CODE: %s", "MQTT_CONNECTION_REFUSE_ID_REJECTED");
-            break;
-        case MQTT_CONNECTION_REFUSE_SERVER_UNAVAILABLE:
-            MQTTC_LOG_E( "ERROR CODE: %s", "MQTT_CONNECTION_REFUSE_SERVER_UNAVAILABLE");
-            break;
-        case MQTT_CONNECTION_REFUSE_BAD_USERNAME:
-            MQTTC_LOG_E( "ERROR CODE: %s", "MQTT_CONNECTION_REFUSE_BAD_USERNAME");
-            break;
-        case MQTT_CONNECTION_REFUSE_NOT_AUTHORIZED:
-            MQTTC_LOG_E( "ERROR CODE: %s", "MQTT_CONNECTION_REFUSE_NOT_AUTHORIZED");
-            break;
-
-        default:
-            MQTTC_LOG_E( "ERROR CODE: %s", "MQTT_CONNECTION_UNKONW_ERR");
-            break;
+        case MQTT_CONNECTION_REFUSE_PROTOCOL:           reason = "unacceptable protocol version"; break;
+        case MQTT_CONNECTION_REFUSE_ID_REJECTED:        reason = "client id rejected"; break;
+        case MQTT_CONNECTION_REFUSE_SERVER_UNAVAILABLE: reason = "server unavailable"; break;
+        case MQTT_CONNECTION_REFUSE_BAD_USERNAME:       reason = "bad username or password"; break;
+        case MQTT_CONNECTION_REFUSE_NOT_AUTHORIZED:     reason = "not authorized"; break;
+        default:                                        reason = "unknown reason"; break;
         }
+        MQTTC_LOG_E( "MQTT connection refused by broker: %s (code %d)",
+                     reason, (int)error_handle->connect_return_code);
         break;
+    }
 
     default:
-        MQTTC_LOG_E( "ERROR TYPE: %s", "MQTT_ERROR_TYPE_UNKOWN");
+        MQTTC_LOG_W( "MQTT error event: type=%d", (int)error_handle->error_type);
         break;
     }
 }
