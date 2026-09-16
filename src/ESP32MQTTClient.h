@@ -121,6 +121,10 @@ public:
 
     void disableAutoReconnect();
     void setTaskPrio(int prio);
+    // Abort a network operation that has not completed after this many ms. esp-mqtt
+    // defaults to 10 s, which also bounds how long esp_mqtt_client_stop() blocks
+    // while tearing the client down. Must be called before the first loop() call.
+    void setNetworkTimeout(int timeoutMs);
 
     /// Main loop, to call at each sketch loop()
     //void loop();

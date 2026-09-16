@@ -94,6 +94,15 @@ void ESP32MQTTClient::setTaskPrio(int prio)
 #endif // IDF CHECK
 }
 
+void ESP32MQTTClient::setNetworkTimeout(int timeoutMs)
+{
+#if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 0, 0)
+    _mqtt_config.network_timeout_ms = timeoutMs;
+#else  // IDF CHECK
+    _mqtt_config.network.timeout_ms = timeoutMs;
+#endif // IDF CHECK
+}
+
 void ESP32MQTTClient::setClientCert(const char *clientCert)
 {
 #if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 0, 0)
